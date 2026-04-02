@@ -1,0 +1,122 @@
+x-mautic-volumes: &mautic-volumes
+  - ./apache-https.conf:/etc/apache2/conf-enabled/https-forwarded.conf
+  - ./mautic/config:/var/www/html/config:z
+  - ./mautic/logs:/var/www/html/var/logs:z
+  - ./mautic/run:/var/www/html/var/run:z
+  - ./mautic/media/files:/var/www/html/docroot/media/files:z
+  - ./mautic/media/images:/var/www/html/docroot/media/images:z
+
+services:
+  db:
+    image: mariadb:10.6
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - TZ=${TIMEZONE}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - ./mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "--user=${MYSQL_USER}", "--password=${MYSQL_PASSWORD}", "ping"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - default
+
+  mautic_web:
+    image: mautic/mautic:${MAUTIC_VERSION}-apache
+    restart: unless-stopped
+    volumes: *mautic-volumes
+    environment:
+      - TZ=${TIMEZONE}
+      - MAUTIC_URL=https://${DOMAIN}
+      - PHP_INI_VALUE_DATE_TIMEZONE=${TIMEZONE}
+    env_file:
+      - .mautic_env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      # Service
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-svc.loadbalancer.server.port=80"
+      # Router: HTTPS
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-secure.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-secure.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-secure.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-secure.service=${COMPOSE_PROJECT_NAME}-svc"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-secure.middlewares=${COMPOSE_PROJECT_NAME}-headers"
+      # Middleware: Forward headers
+      - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-headers.headers.customrequestheaders.X-Forwarded-Port=443"
+    networks:
+      - default
+      - traefik
+
+  mautic_cron:
+    image: mautic/mautic:${MAUTIC_VERSION}-apache
+    volumes: *mautic-volumes
+    env_file:
+      - .mautic_env
+    environment:
+      - TZ=${TIMEZONE}
+    depends_on:
+      db:
+        condition: service_healthy
+      mautic_web:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        echo '=== Mautic cron container starting ==='
+        printenv | sed "s/'/'\\''/g; s/=\(.*\)/='\1'/" > /etc/environment
+        printf 'SHELL=/bin/bash\n' > /etc/cron.d/mautic
+        printf 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n' >> /etc/cron.d/mautic
+        printf '\n' >> /etc/cron.d/mautic
+        printf '* * * * * root . /etc/environment; php /var/www/html/bin/console mautic:segments:update --no-interaction >> /var/www/html/var/logs/cron.log 2>&1\n' >> /etc/cron.d/mautic
+        printf '* * * * * root . /etc/environment; php /var/www/html/bin/console mautic:campaigns:update --no-interaction >> /var/www/html/var/logs/cron.log 2>&1\n' >> /etc/cron.d/mautic
+        printf '* * * * * root . /etc/environment; php /var/www/html/bin/console mautic:campaigns:trigger --no-interaction >> /var/www/html/var/logs/cron.log 2>&1\n' >> /etc/cron.d/mautic
+        printf '* * * * * root . /etc/environment; php /var/www/html/bin/console mautic:messages:send --no-interaction >> /var/www/html/var/logs/cron.log 2>&1\n' >> /etc/cron.d/mautic
+        printf '* * * * * root . /etc/environment; php /var/www/html/bin/console mautic:broadcasts:send --no-interaction >> /var/www/html/var/logs/cron.log 2>&1\n' >> /etc/cron.d/mautic
+        chmod 0644 /etc/cron.d/mautic
+        echo '=== Crontab installed ==='
+        cat /etc/cron.d/mautic
+        cron -f
+    networks:
+      - default
+
+  mautic_worker:
+    image: mautic/mautic:${MAUTIC_VERSION}-apache
+    restart: unless-stopped
+    volumes: *mautic-volumes
+    environment:
+      - DOCKER_MAUTIC_ROLE=mautic_worker
+      - TZ=${TIMEZONE}
+      - MAUTIC_WORKER_CONSUMERS=email,hit
+    env_file:
+      - .mautic_env
+    depends_on:
+      mautic_web:
+        condition: service_healthy
+    networks:
+      - default
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME}-docker
+  traefik:
+    external: true
+    name: traefik

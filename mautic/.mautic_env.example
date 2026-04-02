@@ -1,0 +1,24 @@
+# Mautic aplikacijske nastavitve
+# Ta datoteka se NE sme commitati v git (vsebuje gesla)!
+
+# --- Podatkovna baza (mora se ujemati z .env) ---
+MAUTIC_DB_HOST=db
+MAUTIC_DB_PORT=3306
+MAUTIC_DB_NAME=mautic_db
+MAUTIC_DB_USER=mautic_db_user
+MAUTIC_DB_PASSWORD=change_me_strong_password
+
+# --- Messenger (queue) ---
+# doctrine://default = shrani v bazo (enostavno, brez dodatnih servisov)
+# Alternativa: amqp://user:pass@rabbitmq:5672/%2f
+MAUTIC_MESSENGER_DSN_EMAIL=doctrine://default
+MAUTIC_MESSENGER_DSN_HIT=doctrine://default
+
+# --- Mautic Docker zastavice ---
+DOCKER_MAUTIC_RUN_MIGRATIONS=false
+DOCKER_MAUTIC_LOAD_TEST_DATA=false
+
+# --- Proxy / Traefik ---
+TRUSTED_PROXIES=0.0.0.0/0
+TRUSTED_HEADERS=x-forwarded-for,x-forwarded-host,x-forwarded-proto,x-forwarded-port,x-forwarded-prefix
+
