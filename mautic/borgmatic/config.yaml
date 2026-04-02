@@ -1,0 +1,43 @@
+repositories:
+  - path: ssh://${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}:23/./borg/${COMPOSE_PROJECT_NAME}
+    label: hetzner
+
+source_directories:
+  - /mautic/config
+  # Media se backupa redkeje — glej hooks spodaj
+
+encryption_passphrase: "${BORG_PASSPHRASE}"
+
+compression: lz4
+
+# Retention policy
+keep_daily: 7
+keep_weekly: 4
+keep_monthly: 3
+
+# Preverjanje integritete enkrat na teden
+checks:
+  - name: repository
+    frequency: 1 week
+  - name: archives
+    frequency: 1 week
+
+hooks:
+  # Pred vsakim backupom naredi DB dump
+  before_backup:
+    - echo "=== Začenjam backup: $(date) ==="
+    - mysqldump
+        --host=db
+        --user=${MYSQL_USER}
+        --password=${MYSQL_PASSWORD}
+        --single-transaction
+        --routines
+        --triggers
+        ${MYSQL_DATABASE} > /db_dumps/mautic_db.sql
+    - echo "=== DB dump uspešen ==="
+
+  after_backup:
+    - echo "=== Backup uspešen: $(date) ==="
+
+  on_error:
+    - echo "=== BACKUP NAPAKA: $(date) ===" >&2

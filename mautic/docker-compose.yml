@@ -8,7 +8,7 @@ x-mautic-volumes: &mautic-volumes
 
 services:
   db:
-    image: mariadb:10.6
+    image: mariadb:11.4
     restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
@@ -19,7 +19,7 @@ services:
     volumes:
       - ./mariadb-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "--user=${MYSQL_USER}", "--password=${MYSQL_PASSWORD}", "ping"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       start_period: 5s
       interval: 5s
       timeout: 5s
@@ -113,6 +113,36 @@ services:
         condition: service_healthy
     networks:
       - default
+
+  backup:
+    image: ghcr.io/borgmatic-collective/borgmatic:latest
+    restart: unless-stopped
+    environment:
+      - TZ=${TIMEZONE}
+      - BORG_PASSPHRASE=${BORG_PASSPHRASE}
+      - BORG_RSH=ssh -i /root/.ssh/hetzner_storage -o StrictHostKeyChecking=no
+    volumes:
+      # Borgmatic konfiguracija
+      - ./borgmatic/config.yaml:/etc/borgmatic.d/config.yaml:ro
+      - ./borgmatic/crontab.txt:/etc/borgmatic.d/crontab.txt:ro
+      # SSH ključ za Hetzner Storage Box
+      - ./borgmatic/ssh:/root/.ssh:ro
+      # Mautic podatki (read-only)
+      - ./mautic/config:/mautic/config:ro
+      - ./mautic/media:/mautic/media:ro
+      # Borg cache (pohitri backupe)
+      - borgmatic_cache:/root/.cache/borg
+      # DB dumpi (sem backup container zapisuje dumpe)
+      - db_dumps:/db_dumps
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - default
+
+volumes:
+  borgmatic_cache:
+  db_dumps:
 
 networks:
   default:

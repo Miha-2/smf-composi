@@ -1,0 +1,19 @@
+# Okolijske spremenljivke z gesli - NIKOLI ne commitaj!
+.env
+.mautic_env
+
+# Let's Encrypt certifikati
+letsencrypt/acme.json
+
+# Mautic podatki (generira se ob zagonu)
+mautic/config/
+mautic/logs/
+mautic/run/
+mautic/media/
+
+# Baza
+mariadb-data/
+
+# OS
+.DS_Store
+Thumbs.db

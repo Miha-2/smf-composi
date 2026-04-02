@@ -1,0 +1,6 @@
+# DB + config: 3x na dan (ob 2:00, 10:00, 18:00)
+0 2,10,18 * * * root PATH=$PATH:/usr/bin borgmatic --verbosity -1 --syslog-verbosity 1 2>&1
+
+# Media: enkrat na 3 dni (ob 3:00)
+# Posebna konfiguracija ki doda media direktorij
+0 3 */3 * * root PATH=$PATH:/usr/bin borgmatic --config /etc/borgmatic.d/config-media.yaml --verbosity -1 2>&1

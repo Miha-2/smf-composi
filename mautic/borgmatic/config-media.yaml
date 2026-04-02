@@ -1,0 +1,33 @@
+repositories:
+  - path: ssh://${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}:23/./borg/${COMPOSE_PROJECT_NAME}-media
+    label: hetzner-media
+
+source_directories:
+  - /mautic/config
+  - /mautic/media
+
+encryption_passphrase: "${BORG_PASSPHRASE}"
+
+compression: lz4
+
+keep_daily: 3
+keep_weekly: 2
+keep_monthly: 2
+
+hooks:
+  before_backup:
+    - echo "=== Začenjam media backup: $(date) ==="
+    - mysqldump
+        --host=db
+        --user=${MYSQL_USER}
+        --password=${MYSQL_PASSWORD}
+        --single-transaction
+        --routines
+        --triggers
+        ${MYSQL_DATABASE} > /db_dumps/mautic_db.sql
+
+  after_backup:
+    - echo "=== Media backup uspešen: $(date) ==="
+
+  on_error:
+    - echo "=== MEDIA BACKUP NAPAKA: $(date) ===" >&2
