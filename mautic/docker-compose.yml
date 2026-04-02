@@ -35,7 +35,7 @@ services:
       - TZ=${TIMEZONE}
       - MAUTIC_URL=https://${DOMAIN}
       - PHP_INI_VALUE_DATE_TIMEZONE=${TIMEZONE}
-      - MAUTIC_CONFIG_DEFAULT_TIMEZONE=${TIMEZONE}
+      - MAUTIC_DEFAULT_TIMEZONE=${TIMEZONE}
     env_file:
       - .mautic_env
     healthcheck:
