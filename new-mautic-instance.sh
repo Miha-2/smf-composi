@@ -80,10 +80,62 @@ TRUSTED_PROXIES=0.0.0.0/0
 TRUSTED_HEADERS=x-forwarded-for,x-forwarded-host,x-forwarded-proto,x-forwarded-port,x-forwarded-prefix
 EOF
 
-# ── Zaženi ───────────────────────────────
+# ── Backup (opcijsko) ────────────────────
 echo ""
-echo "→ Zaganjam kontejnerje..."
-docker compose up -d
+read -p "Ali želiš aktivirati backupe na Hetzner Storage Box? [d/N]: " SETUP_BACKUP
+if [[ "$SETUP_BACKUP" =~ ^[dD]$ ]]; then
+    echo ""
+    echo "── Hetzner Storage Box ──"
+    read -p "Storage Box uporabnik (npr. u123456): " STORAGE_BOX_USER
+    read -p "Storage Box host (npr. u123456.your-storagebox.de): " STORAGE_BOX_HOST
+    read -s -p "Borg passphrase (dolgo naključno geslo — shrani na varno!): " BORG_PASSPHRASE; echo ""
+
+    # Dodaj backup spremenljivke v .env
+    cat >> .env <<EOF
+
+# --- Hetzner Storage Box ---
+STORAGE_BOX_USER=${STORAGE_BOX_USER}
+STORAGE_BOX_HOST=${STORAGE_BOX_HOST}
+
+# --- BorgBackup ---
+BORG_PASSPHRASE=${BORG_PASSPHRASE}
+EOF
+
+    # Ustvari SSH ključ
+    echo "→ Ustvarjam SSH ključ za Storage Box..."
+    ssh-keygen -t ed25519 -f borgmatic/ssh/hetzner_storage -N ""
+    chmod 700 borgmatic/ssh
+    chmod 600 borgmatic/ssh/hetzner_storage
+
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║  ⚠  DODAJ JAVNI KLJUČ V HETZNER ROBOT                      ║"
+    echo "║  Storage Box → SSH Keys → Add key                           ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+    cat borgmatic/ssh/hetzner_storage.pub
+    echo ""
+    read -p "Ko dodaš ključ, pritisni ENTER za nadaljevanje..."
+
+    # Zaženi vse skupaj
+    echo "→ Zaganjam kontejnerje..."
+    docker compose up -d
+
+    # Inicializiraj Borg repozitorij
+    echo "→ Inicializiram Borg repozitorij..."
+    docker compose run --rm backup \
+        borg init --encryption=repokey \
+        "ssh://${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}:23/./borg/${PROJECT_NAME}"
+    docker compose run --rm backup \
+        borg init --encryption=repokey \
+        "ssh://${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}:23/./borg/${PROJECT_NAME}-media"
+
+    echo "✓ Backupi aktivirani."
+else
+    # Zaženi brez backup containerja
+    echo "→ Zaganjam kontejnerje..."
+    docker compose up -d --scale backup=0
+fi
 
 # ── DNS reminder ─────────────────────────
 echo ""
