@@ -121,7 +121,13 @@ services:
     environment:
       - TZ=${TIMEZONE}
       - BORG_PASSPHRASE=${BORG_PASSPHRASE}
-      - BORG_RSH=ssh -i /root/.ssh/hetzner_storage -o StrictHostKeyChecking=no
+      - BORG_RSH=ssh -i /root/.ssh/hetzner_storage -o StrictHostKeyChecking=accept-new
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
+      - STORAGE_BOX_USER=${STORAGE_BOX_USER}
+      - STORAGE_BOX_HOST=${STORAGE_BOX_HOST}
     volumes:
       # Borgmatic konfiguracija
       - ./borgmatic/config.yaml:/etc/borgmatic.d/config.yaml:ro
