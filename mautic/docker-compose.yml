@@ -92,6 +92,7 @@ services:
         printf '* * * * * root . /etc/environment; php /var/www/html/bin/console mautic:campaigns:trigger --no-interaction >> /var/www/html/var/logs/cron.log 2>&1\n' >> /etc/cron.d/mautic
         printf '* * * * * root . /etc/environment; php /var/www/html/bin/console mautic:messages:send --no-interaction >> /var/www/html/var/logs/cron.log 2>&1\n' >> /etc/cron.d/mautic
         printf '* * * * * root . /etc/environment; php /var/www/html/bin/console mautic:broadcasts:send --no-interaction >> /var/www/html/var/logs/cron.log 2>&1\n' >> /etc/cron.d/mautic
+        printf '* * * * * root . /etc/environment; php /var/www/html/bin/console mautic:import --no-interaction >> /var/www/html/var/logs/cron.log 2>&1\n' >> /etc/cron.d/mautic
         chmod 0644 /etc/cron.d/mautic
         echo '=== Crontab installed ==='
         cat /etc/cron.d/mautic
@@ -131,6 +132,7 @@ services:
     volumes:
       # Borgmatic konfiguracija
       - ./borgmatic/config.yaml:/etc/borgmatic.d/config.yaml:ro
+      - ./borgmatic/config-media.yaml:/etc/borgmatic.d/config-media.yaml:ro
       - ./borgmatic/crontab.txt:/etc/borgmatic.d/crontab.txt:ro
       # SSH ključ za Hetzner Storage Box
       - ./borgmatic/ssh:/root/.ssh:ro

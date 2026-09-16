@@ -4,40 +4,36 @@ repositories:
 
 source_directories:
   - /mautic/config
-  # Media se backupa redkeje — glej hooks spodaj
+  - /db_dumps
 
 encryption_passphrase: "${BORG_PASSPHRASE}"
 
 compression: lz4
 
-# Retention policy
 keep_daily: 7
 keep_weekly: 4
 keep_monthly: 3
 
-# Preverjanje integritete enkrat na teden
 checks:
   - name: repository
     frequency: 1 week
   - name: archives
     frequency: 1 week
 
-hooks:
-  # Pred vsakim backupom naredi DB dump
-  before_backup:
-    - echo "=== Začenjam backup: $(date) ==="
-    - mysqldump
-        --host=db
-        --user=${MYSQL_USER}
-        --password=${MYSQL_PASSWORD}
-        --single-transaction
-        --routines
-        --triggers
-        ${MYSQL_DATABASE} > /db_dumps/mautic_db.sql
-    - echo "=== DB dump uspešen ==="
+commands:
+  - before: action
+    when: [create]
+    run:
+      - "echo '=== Začenjam backup: '$(date)"
+      - "mysqldump --host=db --user=${MYSQL_USER} --password=${MYSQL_PASSWORD} --single-transaction --routines --triggers ${MYSQL_DATABASE} > /db_dumps/mautic_db.sql"
+      - "echo '=== DB dump uspešen ==='"
 
-  after_backup:
-    - echo "=== Backup uspešen: $(date) ==="
+  - after: action
+    when: [create]
+    run:
+      - "echo '=== Backup uspešen: '$(date)"
 
-  on_error:
-    - echo "=== BACKUP NAPAKA: $(date) ===" >&2
+  - after: error
+    when: [create, prune, compact, check]
+    run:
+      - "echo '=== BACKUP NAPAKA: '$(date)"

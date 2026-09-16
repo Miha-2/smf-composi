@@ -5,6 +5,7 @@ repositories:
 source_directories:
   - /mautic/config
   - /mautic/media
+  - /db_dumps
 
 encryption_passphrase: "${BORG_PASSPHRASE}"
 
@@ -14,20 +15,20 @@ keep_daily: 3
 keep_weekly: 2
 keep_monthly: 2
 
-hooks:
-  before_backup:
-    - echo "=== Začenjam media backup: $(date) ==="
-    - mysqldump
-        --host=db
-        --user=${MYSQL_USER}
-        --password=${MYSQL_PASSWORD}
-        --single-transaction
-        --routines
-        --triggers
-        ${MYSQL_DATABASE} > /db_dumps/mautic_db.sql
+commands:
+  - before: action
+    when: [create]
+    run:
+      - "echo '=== Začenjam media backup: '$(date)"
+      - "mysqldump --host=db --user=${MYSQL_USER} --password=${MYSQL_PASSWORD} --single-transaction --routines --triggers ${MYSQL_DATABASE} > /db_dumps/mautic_db.sql"
+      - "echo '=== DB dump uspešen ==='"
 
-  after_backup:
-    - echo "=== Media backup uspešen: $(date) ==="
+  - after: action
+    when: [create]
+    run:
+      - "echo '=== Media backup uspešen: '$(date)"
 
-  on_error:
-    - echo "=== MEDIA BACKUP NAPAKA: $(date) ===" >&2
+  - after: error
+    when: [create, prune, compact, check]
+    run:
+      - "echo '=== MEDIA BACKUP NAPAKA: '$(date)"
